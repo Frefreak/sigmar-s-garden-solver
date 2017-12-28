@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import math
+from collections import defaultdict
 from elements import Elem
 
 
@@ -44,16 +45,25 @@ class HexGrid():
         self.elements = {}
         self.active = set()
         self.cur_metal = Elem.lead
+        self.rem = 0
+        self.nums = defaultdict(int)
         for coord in mkCoords(size):
             self.elements[coord] = None
 
     def add_elem(self, coord, el):
         if self._in_grid(coord):
-            self.elements[coord] = el
+            if self.elements[coord] is None:
+                self.rem += 1
+                self.elements[coord] = el
+                self.nums[el] += 1
 
     def remove_elem(self, coord):
         if self._in_grid(coord):
-            self.elements[coord] = None
+            el = self.elements[coord]
+            if el is not None:
+                self.rem -= 1
+                self.elements[coord] = None
+                self.nums[el] -= 1
 
     def mk_active(self, coord):
         if self._in_grid(coord):
@@ -87,13 +97,7 @@ class HexGrid():
         return False
 
     def win(self):
-        for v in self.elements.values():
-            if v is not None:
-                return False
-            return True
-
-    def __eq__(self, g):
-        return g.elements == self.elements
+        return self.rem == 0
 
     def __hash__(self):
         return hash(frozenset(self.elements))

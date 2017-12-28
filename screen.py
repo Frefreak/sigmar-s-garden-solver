@@ -16,6 +16,7 @@ vertex2 = (940, 273.8)
 lw = math.sqrt((vertex1[0] - vertex2[0])**2 + (vertex1[1] - vertex2[1])**2)
 lw_int = round(lw)
 scale = lw * math.sqrt(3)
+#  factor = 2.4
 factor = 2.4
 
 def get_hist(fp):
@@ -38,7 +39,7 @@ def get_similar(hist1, hist2):
     return (i1 + i2 + i3) / 3.
 
 
-sift = cv2.xfeatures2d.SIFT_create(contrastThreshold=0.004)
+sift = cv2.xfeatures2d.SIFT_create(contrastThreshold=0.01)
 def get_des(fp):
     img = cv2.imread(fp, 0)
     #  cv2.equalizeHist(img)
@@ -100,7 +101,7 @@ def init_grid(img):
 
 
 def get_grid():
-    img = cv2.imread('./luA3fgVy0HBZm9tAt1O4I82kgivo5NgH.png', 0)
+    img = cv2.imread('./wBdn5OZ6SfZaL9wCLq3Qk0ydXH7RqQgP.png', 0)
     return init_grid(img)
 
 if __name__ == "__main__":
