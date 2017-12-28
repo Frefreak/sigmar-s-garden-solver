@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import math
 from elements import Elem
 
 
@@ -13,9 +14,9 @@ def mkCoords(sz):
 
 
 # pointy hexgonal
-def cartesian(coord):
+def cartesian(coord, scale=1.):
     x, y = coord
-    return x + 0.5 * y, 0.866 * y  # math.sqrt(3)/2 ~= 0.866
+    return (x + 0.5 * y) * scale, (math.sqrt(3) / 2 * y) * scale
 
 
 neighbour_offset = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)]
