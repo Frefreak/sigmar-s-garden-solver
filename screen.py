@@ -37,51 +37,80 @@ def get_similar(hist1, hist2):
     i3 = cv2.compareHist(hist1[2], hist2[2], cv2.HISTCMP_CORREL)
     return (i1 + i2 + i3) / 3.
 
+
+sift = cv2.xfeatures2d.SIFT_create(contrastThreshold=0.004)
+def get_des(fp):
+    img = cv2.imread(fp, 0)
+    #  cv2.equalizeHist(img)
+    _, des = sift.detectAndCompute(img, None)
+    return des
+
+def get_desi(img):
+    #  cv2.equalizeHist(img)
+    _, des = sift.detectAndCompute(img, None)
+    return des
+
 samples = {}
 def init_sample():
     for el in Elem:
         fp = os.path.join('samples', el.name + '.png')
         fpi = os.path.join('samples', el.name + '-inactive.png')
-        samples[el] = (get_hist(fp), get_hist(fpi))
-    samples['empty'] = get_hist('samples/empty.png')
+        samples[el] = (get_des(fp), get_des(fpi))
 init_sample()
-
 
 def get_img_at_pos(arr, coord):
     pcx, pcy = hexgrid.cartesian(coord, scale=scale)
     pcx, pcy = round(pcx + center[0]), round(center[1] - pcy)
     sub_img = arr[pcy-round(lw/factor):pcy+round(lw/factor)+1,
-                  pcx-round(lw/factor):pcx+round(lw/factor)+1, :]
+                  pcx-round(lw/factor):pcx+round(lw/factor)+1]
     return sub_img
 
-def init_grid(fp):
-    img = cv2.imread(fp)
+
+bf = cv2.BFMatcher()
+def get_matches(des1, des2):
+    nm = 0
+    matches = bf.knnMatch(des1, des2, k=2)
+    for m, n in matches:
+        if m.distance < 0.75 * n.distance:
+            nm += 1
+    return nm
+
+
+def init_grid(img):
     grid = hexgrid.HexGrid(6)
     for coord in grid.elements:
         sub_img = get_img_at_pos(img, coord)
-        hist = get_histi(sub_img)
-        max_si = get_similar(samples['empty'], hist)
+        des = get_desi(sub_img)
+        max_match = 0
         this_el = None
-        active = False
         for el in Elem:
-            s1 = get_similar(samples[el][0], hist)
-            s2 = get_similar(samples[el][1], hist)
-            if s1 > max_si:
-                max_si = s1
+            cand1 = get_matches(des, samples[el][0])
+            cand2 = get_matches(des, samples[el][1])
+            cand = max(cand1, cand2)
+            if cand > max_match:
+                max_match = cand
                 this_el = el
-                active = True
-            if s2 > max_si:
-                max_si = s1
-                this_el = el
-                active = False
-        if max_si > 0.4:
+        if max_match >= 3:
             grid.add_elem(coord, this_el)
-            if active:
-                grid.mk_active(coord)
         else:
-            print(coord, max_si, this_el, active)
+            #  print(coord, max_match, this_el)
+            pass
+    grid.purge()
     return grid
 
+
+def get_grid():
+    img = cv2.imread('./luA3fgVy0HBZm9tAt1O4I82kgivo5NgH.png', 0)
+    return init_grid(img)
+
 if __name__ == "__main__":
-    grid = init_grid('./luA3fgVy0HBZm9tAt1O4I82kgivo5NgH.png')
+    grid = get_grid()
     visual.draw_grid(grid)
+    total = {}
+    for el in Elem:
+        total[el] = 0
+    for coord, el in grid.elements.items():
+        if el is not None:
+            total[el] += 1
+    for el in Elem:
+        print(el, total[el])
