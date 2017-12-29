@@ -4,10 +4,22 @@ import math
 import os
 import sys
 import cv2
+import uuid
+
+
+from keras.models import load_model
+import numpy as np
+from PIL import Image
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 
 import hexgrid
 from elements import Elem
 import visual
+
+model_file = 'model.h5'
+model = load_model(model_file)
 
 center = (940, 349.5)
 vertex1 = (940, 312.2)
@@ -19,99 +31,80 @@ scale = lw * math.sqrt(3)
 #  factor = 2.4
 factor = 2.4
 
-def get_hist(fp):
-    img = cv2.imread(fp)
-    h1 = cv2.calcHist([img], [0], None, [256], [0, 256])
-    h2 = cv2.calcHist([img], [1], None, [256], [0, 256])
-    h3 = cv2.calcHist([img], [2], None, [256], [0, 256])
-    return (h1, h2, h3)
-
-def get_histi(img):
-    h1 = cv2.calcHist([img], [0], None, [256], [0, 256])
-    h2 = cv2.calcHist([img], [1], None, [256], [0, 256])
-    h3 = cv2.calcHist([img], [2], None, [256], [0, 256])
-    return (h1, h2, h3)
-
-def get_similar(hist1, hist2):
-    i1 = cv2.compareHist(hist1[0], hist2[0], cv2.HISTCMP_CORREL)
-    i2 = cv2.compareHist(hist1[1], hist2[1], cv2.HISTCMP_CORREL)
-    i3 = cv2.compareHist(hist1[2], hist2[2], cv2.HISTCMP_CORREL)
-    return (i1 + i2 + i3) / 3.
-
-
-sift = cv2.xfeatures2d.SIFT_create(contrastThreshold=0.01)
-def get_des(fp):
-    img = cv2.imread(fp, 0)
-    #  cv2.equalizeHist(img)
-    _, des = sift.detectAndCompute(img, None)
-    return des
-
-def get_desi(img):
-    #  cv2.equalizeHist(img)
-    _, des = sift.detectAndCompute(img, None)
-    return des
-
-samples = {}
-def init_sample():
-    for el in Elem:
-        fp = os.path.join('samples', el.name + '.png')
-        fpi = os.path.join('samples', el.name + '-inactive.png')
-        samples[el] = (get_des(fp), get_des(fpi))
-init_sample()
 
 def get_img_at_pos(arr, coord):
     pcx, pcy = hexgrid.cartesian(coord, scale=scale)
     pcx, pcy = round(pcx + center[0]), round(center[1] - pcy)
     sub_img = arr[pcy-round(lw/factor):pcy+round(lw/factor)+1,
-                  pcx-round(lw/factor):pcx+round(lw/factor)+1]
-    return sub_img
+                  pcx-round(lw/factor):pcx+round(lw/factor)+1, :]
+    return sub_img[:32, :32, :]
 
 
-bf = cv2.BFMatcher()
-def get_matches(des1, des2):
-    nm = 0
-    matches = bf.knnMatch(des1, des2, k=2)
-    for m, n in matches:
-        if m.distance < 0.75 * n.distance:
-            nm += 1
-    return nm
-
+def predict(img):
+    labels = model.predict_classes(img)
+    return labels_map[labels[0]]
 
 def init_grid(img):
     grid = hexgrid.HexGrid(6)
     for coord in grid.elements:
         sub_img = get_img_at_pos(img, coord)
-        des = get_desi(sub_img)
-        max_match = 0
-        this_el = None
-        for el in Elem:
-            cand1 = get_matches(des, samples[el][0])
-            cand2 = get_matches(des, samples[el][1])
-            cand = max(cand1, cand2)
-            if cand > max_match:
-                max_match = cand
-                this_el = el
-        if max_match >= 3:
-            grid.add_elem(coord, this_el)
-        else:
-            #  print(coord, max_match, this_el)
-            pass
+        label = model.predict_classes(sub_img)
+        grid.add_elem(coord, labels_map[label[0]])
     grid.purge()
     return grid
 
 
 def get_grid():
-    img = cv2.imread('./wBdn5OZ6SfZaL9wCLq3Qk0ydXH7RqQgP.png', 0)
+    #  img = cv2.imread('./wBdn5OZ6SfZaL9wCLq3Qk0ydXH7RqQgP.png')
+    #  img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = load_image('./wBdn5OZ6SfZaL9wCLq3Qk0ydXH7RqQgP.png')
     return init_grid(img)
 
-if __name__ == "__main__":
-    grid = get_grid()
-    visual.draw_grid(grid)
-    total = {}
-    for el in Elem:
-        total[el] = 0
-    for coord, el in grid.elements.items():
-        if el is not None:
-            total[el] += 1
-    for el in Elem:
-        print(el, total[el])
+def mk_data(fp):
+    img = Image.open(fp)
+    img = np.asarray(img.convert('RGB'))
+    grid = hexgrid.HexGrid(6)
+    for coord in grid.elements:
+        rnd = str(uuid.uuid4())
+        sub_img = get_img_at_pos(img, coord)
+        Image.fromarray(sub_img).save(f'storage/{rnd}.png')
+
+def load_image(im):
+    if isinstance(im, str):
+        img = Image.open(im)
+        img = np.asarray(img.convert('RGB')) / 255.
+    elif isinstance(im, np.ndarray):
+        img = im
+    elif callable(im):
+        img = im()
+    else:
+        raise ValueError("must be image path or numpy's ndarray")
+    return img
+
+labels = sorted(os.listdir('samples'))
+labels_map = {}
+for i, name in enumerate(labels):
+    if name != 'empty':
+        labels_map[i] = eval(f'Elem.{name}')
+    else:
+        labels_map[i] = 'None'
+
+import re
+for i in os.listdir('.'):
+    if re.findall('.png', i):
+        print(i)
+        mk_data(i)
+#  if __name__ == "__main__":
+    #  grid = get_grid()
+    #  visual.draw_grid(grid)
+    #  total = {}
+    #  for el in Elem:
+        #  total[el] = 0
+    #  for coord, el in grid.elements.items():
+        #  if el is not None:
+            #  total[el] += 1
+    #  for el in Elem:
+        #  print(el, total[el])
+#  labels = open('./data/label_list.txt', 'r').read().splitlines() + \
+            #  ['none']
+#  labels = np.array(labels)
