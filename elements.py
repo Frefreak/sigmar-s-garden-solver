@@ -20,3 +20,12 @@ class Elem(Enum):
 
     def __init__(self, color):
         self.color = color
+
+metal_value = {
+    Elem.lead: 1,
+    Elem.tin: 2,
+    Elem.iron: 3,
+    Elem.copper: 4,
+    Elem.silver: 5,
+    Elem.gold: 6
+}

@@ -41,23 +41,21 @@ def get_img_at_pos(arr, coord):
 
 
 def predict(img):
-    labels = model.predict_classes(img)
+    labels = model.predict_classes(img.reshape(1, 32, 32, 3))
     return labels_map[labels[0]]
 
 def init_grid(img):
     grid = hexgrid.HexGrid(6)
     for coord in grid.elements:
         sub_img = get_img_at_pos(img, coord)
-        label = model.predict_classes(sub_img)
-        grid.add_elem(coord, labels_map[label[0]])
+        el = predict(sub_img)
+        grid.add_elem(coord, el)
     grid.purge()
     return grid
 
 
-def get_grid():
-    #  img = cv2.imread('./wBdn5OZ6SfZaL9wCLq3Qk0ydXH7RqQgP.png')
-    #  img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = load_image('./wBdn5OZ6SfZaL9wCLq3Qk0ydXH7RqQgP.png')
+def get_grid(fp):
+    img = load_image(fp)
     return init_grid(img)
 
 def mk_data(fp):
@@ -87,24 +85,11 @@ for i, name in enumerate(labels):
     if name != 'empty':
         labels_map[i] = eval(f'Elem.{name}')
     else:
-        labels_map[i] = 'None'
+        labels_map[i] = None
 
-import re
-for i in os.listdir('.'):
-    if re.findall('.png', i):
-        print(i)
-        mk_data(i)
-#  if __name__ == "__main__":
-    #  grid = get_grid()
-    #  visual.draw_grid(grid)
-    #  total = {}
-    #  for el in Elem:
-        #  total[el] = 0
-    #  for coord, el in grid.elements.items():
-        #  if el is not None:
-            #  total[el] += 1
-    #  for el in Elem:
-        #  print(el, total[el])
-#  labels = open('./data/label_list.txt', 'r').read().splitlines() + \
-            #  ['none']
-#  labels = np.array(labels)
+if __name__ == "__main__":
+    grid = get_grid('./iOGMTw0IToE1biF0guRsHIGkn38bLNos.png')
+    visual.draw_grid(grid)
+    total = {}
+    for el in Elem:
+        print(el, grid.nums[el])

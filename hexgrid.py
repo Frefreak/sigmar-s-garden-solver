@@ -2,7 +2,8 @@
 
 import math
 from collections import defaultdict
-from elements import Elem
+from elements import Elem, metal_value
+from hashlib import md5
 
 
 def mkCoords(sz):
@@ -44,18 +45,24 @@ class HexGrid():
         self.size = size
         self.elements = {}
         self.active = set()
-        self.cur_metal = Elem.lead
+        self.cur_metal = Elem.gold
         self.rem = 0
         self.nums = defaultdict(int)
+        self.gold_coord = None
         for coord in mkCoords(size):
             self.elements[coord] = None
 
     def add_elem(self, coord, el):
         if self._in_grid(coord):
-            if self.elements[coord] is None:
+            if self.elements[coord] is None and el is not None:
                 self.rem += 1
                 self.elements[coord] = el
                 self.nums[el] += 1
+                if is_metal(el):
+                    if metal_value[el] < metal_value[self.cur_metal]:
+                        self.cur_metal = el
+                if el is Elem.gold:
+                    self.gold_coord = coord
 
     def remove_elem(self, coord):
         if self._in_grid(coord):
@@ -64,6 +71,12 @@ class HexGrid():
                 self.rem -= 1
                 self.elements[coord] = None
                 self.nums[el] -= 1
+                if is_metal(el):
+                    if el is Elem.gold:
+                        self.gold_coord = None
+                    else:
+                        self.cur_metal = \
+                            metals[metals.index(self.cur_metal) + 1]
 
     def mk_active(self, coord):
         if self._in_grid(coord):
@@ -79,8 +92,6 @@ class HexGrid():
                 if is_metal(el):
                     if el == self.cur_metal:
                         self.active.add(coord)
-                        #  don't check if is gold, call purge after rm it
-                        self.cur_metal = metals[metals.index(el) + 1]
                 else:
                     self.active.add(coord)
 
@@ -100,4 +111,5 @@ class HexGrid():
         return self.rem == 0
 
     def __hash__(self):
-        return hash(frozenset(self.elements))
+        h = md5(repr(sorted(self.elements.items())).encode())
+        return int(h.hexdigest(), 16)

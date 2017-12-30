@@ -4,7 +4,9 @@ from copy import deepcopy
 import visual
 from elements import Elem as E
 from itertools import combinations
-import screen
+import numpy as np
+import hexgrid
+#  import screen
 
 
 _match_rules = set([
@@ -33,33 +35,40 @@ for r1, r2 in _match_rules:
 # single gold is a rule too
 
 
-def score(grid, comb):
-    if comb[0] == E.quicksilver or comb[1] == E.quicksilver:
-        return 5
-    if comb[0] == E.vitae or comb[1] == E.vitae:
-        return 4
-    if comb[0] == E.salt or comb[1] == E.salt:
-        return 2
-    if comb[0] == E.salt and comb[1] == E.salt:
-        return 0
+def score(grid, comb_):
+    c1, c2, comb = comb_
+    #  for nb in hexgrid.neighbours(c1) + hexgrid.neighbours(c2):
+        #  if grid._in_grid(nb) and grid.elements[nb] == grid.cur_metal:
+            #  return 7
+        #  if grid._in_grid(nb) and grid.elements[nb] in hexgrid.metal_set:
+            #  return 6
+    #  if comb[0] == E.quicksilver or comb[1] == E.quicksilver:
+        #  return 7
+    #  if comb[0] == E.vitae or comb[1] == E.vitae:
+        #  return 4
+    #  if comb[0] == E.salt or comb[1] == E.salt:
+        #  return 2
+    #  if comb[0] == E.salt and comb[1] == E.salt:
+        #  return 0
     if comb[0] == comb[1] and comb[0] in \
             [E.fire, E.earth, E.water, E.air]:
         if grid.nums[comb[0]] == 2:
-            print('gold move')
-            return 10
-    return 3
+            return 20
+    s = 0
+    for nb in set(hexgrid.neighbours(c1) + hexgrid.neighbours(c2)):
+        if grid._in_grid(nb) and grid.elements[nb] is not None \
+                and nb not in grid.active:
+            s += 1
+    return s
 
 def prio_sort(grid, moves):
-    return sorted(moves, key=lambda x: score(grid, x[2]), reverse=True)
+    return sorted(moves, key=lambda x: score(grid, x), reverse=True)
 
 
 def get_valid_moves(grid):
     valid_moves = []
-    if grid.rem == 1:
-        for coord, el in grid.elements.items():
-            if el is E.gold:
-                return [(coord, coord, (E.gold, E.gold))]
-        return []  # bug
+    if grid.gold_coord in grid.active:  # gold exposed, click !
+        return [(grid.gold_coord, grid.gold_coord, (E.gold, E.gold))]
     for x, y in combinations(grid.active, 2):
         comb = grid.elements[x], grid.elements[y]
         if comb in match_rules:
@@ -81,32 +90,42 @@ def solve(grid):
     seen = set()
     seen.add(grid)
     steps = {}
-    stack = [grid]
-    cnt = 0
-    while len(stack) != 0:
-        cur_grid = stack.pop()
-        cnt += 1
-        print(cnt, cur_grid.rem, len(stack), len(seen))
-        if impossible(grid):
+    result = dfs(grid, steps, seen, 0)
+    return result, steps
+
+def dfs(g, steps, seen, depth):
+    #  print(g.rem)
+    print(depth)
+    #  visual.draw_grid(g)
+    if impossible(g):
+        return False
+    for x, y, _ in get_valid_moves(g):
+        #  prev = deepcopy(g)
+        elx = g.elements[x]
+        ely = g.elements[y]
+        g.remove_elem(x)
+        g.remove_elem(y)
+        g.purge()
+        if g in seen:
+            g.add_elem(x, elx)
+            g.add_elem(y, ely)
+            g.purge()
             continue
-        for x, y, _ in get_valid_moves(cur_grid):
-            ngrid = deepcopy(cur_grid)
-            ngrid.remove_elem(x)
-            ngrid.remove_elem(y)
-            ngrid.purge()
-            if ngrid in seen:
-                continue
-            steps[ngrid] = ((x, y), cur_grid)
-            stack.append(ngrid)
-            seen.add(ngrid)
-            if ngrid.win():
-                return steps
-    print('failed')
-    return steps
+        steps[depth] = (x, y)
+        seen.add(g)
+        if g.win():
+            return True
+        if not dfs(g, steps, seen, depth+1):
+            g.add_elem(x, elx)
+            g.add_elem(y, ely)
+            g.purge()
+        else:
+            return True
+    return False
 
 
 if __name__ == "__main__":
-    g = screen.get_grid()
-    visual.draw_grid(g)
+    g = np.load('test.npy').item()
+    #  visual.draw_grid(g)
     print('start')
     print(solve(g))
